@@ -1,0 +1,53 @@
+- hosts: vagrant
+  become: true
+  vars:
+    server_common_name: "vagrant"
+  tasks:
+      - name: Create directory for certificates and keys on remote
+        file:
+          path: "/tmp/ansible/certificate"
+          state: directory
+          mode: '0755'
+          
+      - name: Generate private key
+        community.crypto.openssl_privatekey:
+          path: "/tmp/ansible/certificate/server_private_key.pem"
+          type: RSA
+          size: 2048
+        register: private_key
+
+      - name: Generate CSR (Certificate Signing Request)
+        community.crypto.openssl_csr:
+          path: "/tmp/ansible/certificate/server.csr"
+          privatekey_path: "/tmp/ansible/certificate/server_private_key.pem"
+          common_name: "{{ server_common_name }}"
+        register: csr
+
+      - name: Pull CSR to local machine
+        fetch:
+          src: "/tmp/ansible/certificate/server.csr"
+          dest: "/tmp/ansible/certificate/server.csr"
+          flat: yes
+
+- name: Generate  certificates 
+  hosts: localhost
+  become: true
+  vars:
+    ca_passphrase: "{{ CApasspherese }}"
+  tasks:
+
+    - name: Generate a Self Signed OpenSSL certificate
+      community.crypto.x509_certificate:
+        path: "/tmp/ansible/certificate/server_certificate.crt"
+        privatekey_path: "/tmp/ansible/certificate/CAPrivate.key"
+        csr_path: "/tmp/ansible/certificate/server.csr"
+        provider: selfsigned
+        privatekey_passphrase: "{{ ca_passphrase }}"
+    
+    - name: Copy server certificate back to vagrant host
+      copy:
+        src: "/tmp/ansible/certificate/server_certificate.crt"
+        dest: "/tmp/server_certificate.crt"
+      delegate_to: vagrant
+        
+

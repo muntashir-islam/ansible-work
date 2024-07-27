@@ -1,0 +1,25 @@
+- hosts: vagrant
+  become: true
+  tasks:
+    - name: Copy CA certificate to remote server
+      copy:
+        src: CAPrivate.pem # Replace with the path to your local CA file
+        dest: /etc/ssh/CAPrivate.pem # Replace with the path where you want to copy the CA file on the remote server
+        owner: root
+        group: root
+        mode: '0644'  # Adjust permissions as needed
+
+    - name: Add trusted CA to SSH configuration
+      lineinfile:
+        path: /etc/ssh/ssh_config  # or /etc/ssh/sshd_config for SSH server configuration
+        line: "{{ item }}"
+        insertafter: EOF
+      with_items:
+        - "TrustedUserCAKeys /etc/ssh/CAPrivate.pem"  # Use the same path as copied on the remote server
+      notify: Reload SSH
+
+  handlers:
+    - name: Reload SSH
+      service:
+        name: ssh
+        state: reloaded
